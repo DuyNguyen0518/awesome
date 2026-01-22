@@ -74,11 +74,7 @@ awful.layout.layouts = {
     -- awful.layout.suit.fair.horizontal,
     -- awful.layout.suit.spiral,
     awful.layout.suit.spiral.dwindle,
-<<<<<<< HEAD
     awful.layout.suit.max,
-=======
-    -- awful.layout.suit.max,
->>>>>>> main
     -- awful.layout.suit.max.fullscreen,
     -- awful.layout.suit.magnifier,
     -- awful.layout.suit.corner.nw,
@@ -124,17 +120,13 @@ mylauncher = awful.widget.launcher({ image = beautiful.awesome_icon,
 menubar.utils.terminal = terminal -- Set the terminal for applications that require it
 -- }}}
 
--- {{{ Final Setup
--- Set the terminal for the menubar
-menubar.utils.terminal = vars.terminal
+-- Keyboard map indicator and switcher
+mykeyboardlayout = awful.widget.keyboardlayout()
 
--- Set Global Keys
-root.keys(keys.globalkeys)
+-- {{{ Wibar
+-- Create a textclock widget
+mytextclock = wibox.widget.textclock()
 
-<<<<<<< HEAD
--- Set Desktop Mouse Buttons
-root.buttons(keys.desktop_buttons)
-=======
 -- Create a wibox for each screen and add it
 local taglist_buttons = gears.table.join(
                     awful.button({ }, 1, function(t) t:view_only() end),
@@ -587,5 +579,4 @@ end)
 
 client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
 client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
->>>>>>> main
 -- }}}
