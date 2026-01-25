@@ -59,7 +59,7 @@ beautiful.useless_gap = padding
 beautiful.gap_single_client = true
 
 -- This is used later as the default terminal and editor to run.
-terminal = "kitty"
+terminal = "alacritty"
 editor = os.getenv("EDITOR") or "editor"
 editor_cmd = terminal .. " -e " .. editor
 
@@ -326,6 +326,28 @@ globalkeys = gears.table.join(
             end
         end,
         {description = "go back", group = "client"}),
+
+    -- Volume Keys (using amixer)
+    awful.key({ }, "XF86AudioRaiseVolume", function ()
+        awful.spawn("amixer sset Master 5%+")
+    end, {description = "volume up", group = "hotkeys"}),
+
+    awful.key({ }, "XF86AudioLowerVolume", function ()
+        awful.spawn("amixer sset Master 5%-")
+    end, {description = "volume down", group = "hotkeys"}),
+
+    awful.key({ }, "XF86AudioMute", function ()
+        awful.spawn("amixer sset Master toggle")
+    end, {description = "toggle mute", group = "hotkeys"}),
+
+    -- Brightness Keys (using brightnessctl)
+    awful.key({ }, "XF86MonBrightnessUp", function ()
+        awful.spawn("brightnessctl set +10%")
+    end, {description = "brightness up", group = "hotkeys"}),
+
+    awful.key({ }, "XF86MonBrightnessDown", function ()
+        awful.spawn("brightnessctl set 10%-")
+    end, {description = "brightness down", group = "hotkeys"}), 
 
     -- Standard program
     awful.key({ modkey,           }, "Return", function () awful.spawn(terminal) end,
