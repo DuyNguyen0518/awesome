@@ -49,10 +49,17 @@ end
 
 -- {{{ Variable definitions
 -- Themes define colours, icons, font and wallpapers.
+
+-- Declaring other variables
+padding = 4
+
 beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
 
+beautiful.useless_gap = padding
+beautiful.gap_single_client = true
+
 -- This is used later as the default terminal and editor to run.
-terminal = "x-terminal-emulator"
+terminal = "kitty"
 editor = os.getenv("EDITOR") or "editor"
 editor_cmd = terminal .. " -e " .. editor
 
@@ -187,6 +194,8 @@ screen.connect_signal("property::geometry", set_wallpaper)
 awful.screen.connect_for_each_screen(function(s)
     -- Wallpaper
     set_wallpaper(s)
+    
+    s.padding = padding 
 
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
@@ -248,6 +257,8 @@ root.buttons(gears.table.join(
 -- }}}
 
 -- {{{ Key bindings
+local titlebars_enabled = true
+
 globalkeys = gears.table.join(
     awful.key({ modkey,           }, "s",      hotkeys_popup.show_help,
               {description="show help", group="awesome"}),
@@ -257,7 +268,30 @@ globalkeys = gears.table.join(
               {description = "view next", group = "tag"}),
     awful.key({ modkey,           }, "Escape", awful.tag.history.restore,
               {description = "go back", group = "tag"}),
-
+    awful.key({ modkey, "Shift" }, "t",
+        function()
+            titlebars_enabled = not titlebars_enabled
+            for _, c in ipairs(client.get()) do
+                if titlebars_enabled then
+                    awful.titlebar.show(c)
+                else
+                    awful.titlebar.hide(c)
+                end
+            end
+        end,
+        {description = "toggle all titlebars", group = "awesome"}),
+    awful.key({ modkey }, "b",
+        function ()
+            -- Check state of the focused screen's wibar
+            local s = awful.screen.focused()
+            local action = not s.mywibox.visible
+            
+            -- Apply that state to ALL screens
+            for s in screen do
+                s.mywibox.visible = action
+            end
+        end,
+        {description = "toggle wibar", group = "awesome"}),
     awful.key({ modkey,           }, "j",
         function ()
             awful.client.focus.byidx( 1)
@@ -572,6 +606,18 @@ client.connect_signal("request::titlebars", function(c)
         },
         layout = wibox.layout.align.horizontal
     }
+end)
+
+-- Remove borders if there is only one client to save space
+screen.connect_signal("arrange", function (s)
+    local only_one = #s.tiled_clients == 1
+    for _, c in pairs(s.clients) do
+        if only_one and not c.floating then
+            c.border_width = 0
+        else
+            c.border_width = beautiful.border_width
+        end
+    end
 end)
 
 -- Enable sloppy focus, so that focus follows mouse.
