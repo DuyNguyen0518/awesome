@@ -182,6 +182,53 @@ local tasklist_buttons = gears.table.join(
                                               awful.client.focus.byidx(-1)
                                           end))
 
+
+-- {{ Auto-hide Wibar and Titlebars for Fullscreen
+
+-- Function to check all clients and toggle the wibar (top panel)
+local function update_wibar_visibility(s)
+    s = s or awful.screen.focused()
+    if not s.mywibox then return end
+
+    local is_fullscreen = false
+    -- Check if ANY visible client on this screen is currently fullscreen
+    for _, c in ipairs(s.clients) do
+        if c.fullscreen and c:isvisible() then
+            is_fullscreen = true
+            break
+        end
+    end
+    
+    -- Hide wibar if fullscreen is active, otherwise show it
+    s.mywibox.visible = not is_fullscreen
+end
+
+-- Signal to handle the specific client's TITLEBAR
+client.connect_signal("property::fullscreen", function(c)
+    if c.fullscreen then
+        awful.titlebar.hide(c)
+    else
+        awful.titlebar.show(c)
+    end
+    
+    -- After toggling the titlebar, check if we need to hide the wibar
+    update_wibar_visibility(c.screen)
+end)
+
+-- Connect other signals to ensure the wibar stays in sync
+-- (e.g. if you switch tags to a fullscreen window, or close a fullscreen window)
+client.connect_signal("focus", function(c) update_wibar_visibility(c.screen) end)
+client.connect_signal("property::minimized", function(c) update_wibar_visibility(c.screen) end)
+client.connect_signal("tagged", function(c) update_wibar_visibility(c.screen) end)
+client.connect_signal("untagged", function(c) update_wibar_visibility(c.screen) end)
+client.connect_signal("unmanage", function(c) 
+    local s = c.screen
+    -- Delay needed to ensure client is truly gone from the list
+    gears.timer.delayed_call(function() update_wibar_visibility(s) end)
+end)
+
+-- }}}
+
 local function set_wallpaper(s)
     -- Wallpaper
     if beautiful.wallpaper then
