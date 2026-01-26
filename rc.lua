@@ -51,12 +51,17 @@ end
 -- Themes define colours, icons, font and wallpapers.
 
 -- Declaring other variables
-padding = 4
+
+padding = 2
 
 beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
 
 beautiful.useless_gap = padding
 beautiful.gap_single_client = true
+
+awful.layout.suit.tile.left.gap_screen_edge = false
+awful.layout.suit.tile.top.gap_screen_edge = false
+
 
 -- This is used later as the default terminal and editor to run.
 terminal = "alacritty"
@@ -68,6 +73,7 @@ editor_cmd = terminal .. " -e " .. editor
 -- If you do not like this or do not have such a key,
 -- I suggest you to remap Mod4 to another key using xmodmap or other tools.
 -- However, you can use another modifier like Mod1, but it may interact with others.
+
 modkey = "Mod4"
 
 awful.spawn.with_shell("picom -b")
@@ -83,7 +89,7 @@ awful.layout.layouts = {
     -- awful.layout.suit.fair.horizontal,
     -- awful.layout.suit.spiral,
     awful.layout.suit.spiral.dwindle,
-    -- awful.layout.suit.max,
+    awful.layout.suit.max,
     -- awful.layout.suit.max.fullscreen,
     -- awful.layout.suit.magnifier,
     -- awful.layout.suit.corner.nw,
@@ -195,7 +201,7 @@ awful.screen.connect_for_each_screen(function(s)
     -- Wallpaper
     set_wallpaper(s)
     
-    s.padding = padding 
+    s.padding = { left = padding, right = padding, top = padding, bottom = padding } 
 
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
@@ -374,6 +380,18 @@ globalkeys = gears.table.join(
     awful.key({ modkey, "Shift"   }, "space", function () awful.layout.inc(-1)                end,
               {description = "select previous", group = "layout"}),
 
+    awful.key({ modkey, "Control", "Shift" }, "space",
+        function ()
+            local tag = awful.screen.focused().selected_tag
+            if tag then
+                -- Loop through all clients on the current tag
+                for _, c in ipairs(tag:clients()) do
+                    c.floating = false
+                end
+            end
+        end,
+        {description = "unfloat all visible clients", group = "layout"}),
+
     awful.key({ modkey, "Control" }, "n",
               function ()
                   local c = awful.client.restore()
@@ -414,6 +432,11 @@ clientkeys = gears.table.join(
         {description = "toggle fullscreen", group = "client"}),
     awful.key({ modkey, "Shift"   }, "c",      function (c) c:kill()                         end,
               {description = "close", group = "client"}),
+    awful.key({ modkey, "Control" }, "c", function (c)
+        if c.pid then
+            awful.spawn("kill -9 " .. c.pid)
+        end
+        end, {description = "force kill", group = "client"}),
     awful.key({ modkey, "Control" }, "space",  awful.client.floating.toggle                     ,
               {description = "toggle floating", group = "client"}),
     awful.key({ modkey, "Control" }, "Return", function (c) c:swap(awful.client.getmaster()) end,
@@ -578,9 +601,10 @@ awful.rules.rules = {
 -- {{{ Signals
 -- Signal function to execute when a new client appears.
 client.connect_signal("manage", function (c)
-    -- Set the windows at the slave,
-    -- i.e. put it at the end of others instead of setting it master.
-    -- if not awesome.startup then awful.client.setslave(c) end
+    -- Set new windows at the end (Slave) instead of the start (Master).
+    if not awesome.startup then 
+        awful.client.setslave(c) 
+    end
 
     if awesome.startup
       and not c.size_hints.user_position
@@ -588,6 +612,9 @@ client.connect_signal("manage", function (c)
         -- Prevent clients from being unreachable after screen count changes.
         awful.placement.no_offscreen(c)
     end
+    
+    -- Optional: Explicitly focus the new window
+    c:emit_signal("request::activate", "manage", {raise = true})
 end)
 
 -- Add a titlebar if titlebars_enabled is set to true in the rules.
