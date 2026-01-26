@@ -384,9 +384,26 @@ globalkeys = gears.table.join(
         function ()
             local tag = awful.screen.focused().selected_tag
             if tag then
-                -- Loop through all clients on the current tag
-                for _, c in ipairs(tag:clients()) do
-                    c.floating = false
+                local clients = tag:clients()
+                local all_floating = true
+
+                -- Step 1: Check if ALL windows are currently floating
+                for _, c in ipairs(clients) do
+                    if not c.floating then
+                        all_floating = false
+                        break
+                    end
+                end
+
+                -- Step 2: Toggle based on the result
+                -- If they are ALL floating, we want to tile them (false).
+                -- If even one is tiled, we want to float them all (true).
+                local target_state = not all_floating
+
+                for _, c in ipairs(clients) do
+                    c.floating = target_state
+                    -- Optional: Raise them so they don't get lost
+                    if target_state == true then c:raise() end
                 end
             end
         end,
