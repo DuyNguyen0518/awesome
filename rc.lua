@@ -55,7 +55,6 @@ end
 padding = 4
 
 beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
-beautiful.get().wallpaper = "$HOME/Pictures/Wallpapers/background1.jpg"
 beautiful.useless_gap = padding
 beautiful.gap_single_client = true
 
@@ -248,7 +247,7 @@ awful.screen.connect_for_each_screen(function(s)
     -- Wallpaper
     set_wallpaper(s)
     
-    s.padding = { left = padding, right = padding, top = padding, bottom = padding } 
+    -- s.padding = { left = padding, right = padding, top = padding, bottom = padding } 
 
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
@@ -490,8 +489,28 @@ globalkeys = gears.table.join(
 clientkeys = gears.table.join(
     awful.key({ modkey,           }, "f",
         function (c)
+            -- Toggle the fullscreen state
             c.fullscreen = not c.fullscreen
             c:raise()
+
+            if c.fullscreen then
+                -- Hide the wibar (status bar)
+                if c.screen.mywibox then
+                    c.screen.mywibox.visible = false
+                end
+                -- Hide the titlebar
+                awful.titlebar.hide(c)
+            else
+                -- Show the wibar
+                if c.screen.mywibox then
+                    c.screen.mywibox.visible = true
+                end
+                
+                -- Restore the titlebar (only if they are globally enabled)
+                if titlebars_enabled then
+                    awful.titlebar.show(c)
+                end
+            end
         end,
         {description = "toggle fullscreen", group = "client"}),
     awful.key({ modkey, "Shift"   }, "c",      function (c) c:kill()                         end,
