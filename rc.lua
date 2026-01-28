@@ -52,10 +52,10 @@ end
 
 -- Declaring other variables
 
-padding = 2
+padding = 4
 
 beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
-
+beautiful.get().wallpaper = "$HOME/Pictures/Wallpapers/background1.jpg"
 beautiful.useless_gap = padding
 beautiful.gap_single_client = true
 
@@ -516,12 +516,19 @@ clientkeys = gears.table.join(
             c.minimized = true
         end ,
         {description = "minimize", group = "client"}),
+     awful.key({ modkey,           }, "m",
+        function (c)
+            c.maximized = not c.maximized
+            c:raise()
+        end ,
+        {description = "(un)maximize", group = "client"}),
     awful.key({ modkey,           }, "m",
         function (c)
             c.maximized = not c.maximized
             c:raise()
         end ,
         {description = "(un)maximize", group = "client"}),
+
     awful.key({ modkey, "Control" }, "m",
         function (c)
             c.maximized_vertical = not c.maximized_vertical
