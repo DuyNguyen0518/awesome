@@ -53,6 +53,12 @@ end
 -- Declaring other variables
 
 padding = 4
+global_wibar_enabled = true
+global_titlebar_enabled = true
+user_wibar_enabled = true
+user_titlebars_enabled = true
+
+-- Theme and Background
 
 beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
 beautiful.useless_gap = padding
@@ -61,6 +67,17 @@ beautiful.gap_single_client = true
 awful.layout.suit.tile.left.gap_screen_edge = false
 awful.layout.suit.tile.top.gap_screen_edge = false
 
+-- {{{ Border Settings
+-- Width of the border (in pixels). 
+-- 3 is usually thick enough to be clearly visible.
+beautiful.border_width = 2
+
+-- The color of the window currently in focus (Orange to match your tags)
+beautiful.border_focus  = "#00ffff" 
+
+-- The color of windows NOT in focus (Dark Grey or Black)
+beautiful.border_normal = "#333333" 
+-- }}}
 
 -- This is used later as the default terminal and editor to run.
 terminal = "alacritty"
@@ -180,17 +197,20 @@ local tasklist_buttons = gears.table.join(
                      awful.button({ }, 5, function ()
                                               awful.client.focus.byidx(-1)
                                           end))
+-- {{{ Smart Wibar and Titlebar Visibility
 
-
--- {{ Auto-hide Wibar and Titlebars for Fullscreen
-
--- Function to check all clients and toggle the wibar (top panel)
+-- Function to check if the Wibar should be visible
 local function update_wibar_visibility(s)
     s = s or awful.screen.focused()
-    if not s.mywibox then return end
+    
+    -- 1. MASTER CHECK: If user manually disabled it, KEEP IT HIDDEN.
+    if not global_wibar_enabled then
+        if s.mywibox then s.mywibox.visible = false end
+        return
+    end
 
+    -- 2. FULLSCREEN CHECK: If user enabled it, only hide for fullscreen.
     local is_fullscreen = false
-    -- Check if ANY visible client on this screen is currently fullscreen
     for _, c in ipairs(s.clients) do
         if c.fullscreen and c:isvisible() then
             is_fullscreen = true
@@ -198,33 +218,48 @@ local function update_wibar_visibility(s)
         end
     end
     
-    -- Hide wibar if fullscreen is active, otherwise show it
-    s.mywibox.visible = not is_fullscreen
+    if s.mywibox then
+        -- Visible if NO window is fullscreen
+        s.mywibox.visible = not is_fullscreen
+    end
 end
 
--- Signal to handle the specific client's TITLEBAR
-client.connect_signal("property::fullscreen", function(c)
+-- Function to check if a specific client should have a Titlebar
+local function update_client_titlebar(c)
+    -- 1. MASTER CHECK: If user disabled titlebars, hide them.
+    if not global_titlebar_enabled then
+        awful.titlebar.hide(c)
+        return
+    end
+
+    -- 2. FULLSCREEN CHECK: Hide if this specific client is fullscreen.
     if c.fullscreen then
         awful.titlebar.hide(c)
     else
         awful.titlebar.show(c)
     end
-    
-    -- After toggling the titlebar, check if we need to hide the wibar
+end
+
+-- SIGNALS: Trigger these checks automatically
+
+-- When a window changes fullscreen state
+client.connect_signal("property::fullscreen", function(c)
+    update_client_titlebar(c)
     update_wibar_visibility(c.screen)
 end)
 
--- Connect other signals to ensure the wibar stays in sync
--- (e.g. if you switch tags to a fullscreen window, or close a fullscreen window)
-client.connect_signal("focus", function(c) update_wibar_visibility(c.screen) end)
-client.connect_signal("property::minimized", function(c) update_wibar_visibility(c.screen) end)
-client.connect_signal("tagged", function(c) update_wibar_visibility(c.screen) end)
-client.connect_signal("untagged", function(c) update_wibar_visibility(c.screen) end)
-client.connect_signal("unmanage", function(c) 
-    local s = c.screen
-    -- Delay needed to ensure client is truly gone from the list
-    gears.timer.delayed_call(function() update_wibar_visibility(s) end)
+-- When a window is managed (opened)
+client.connect_signal("manage", function(c)
+    update_client_titlebar(c)
+    -- Small delay to allow the window to settle
+    gears.timer.delayed_call(function() update_wibar_visibility(c.screen) end)
 end)
+
+-- When switching focus or tags (to ensure wibar updates)
+client.connect_signal("focus", function(c) update_wibar_visibility(c.screen) end)
+tag.connect_signal("property::selected", function(t) update_wibar_visibility(t.screen) end)
+client.connect_signal("unmanage", function(c) update_wibar_visibility(c.screen) end)
+client.connect_signal("property::minimized", function(c) update_wibar_visibility(c.screen) end)
 
 -- }}}
 
@@ -277,7 +312,8 @@ awful.screen.connect_for_each_screen(function(s)
     }
 
     -- Create the wibox
-    s.mywibox = awful.wibar({ position = "top", screen = s })
+    s.mywibox = awful.wibar({ position = "top", screen = s, ontop = true })
+    update_wibar_visibility(s)
 
     -- Add widgets to the wibox
     s.mywibox:setup {
@@ -322,25 +358,17 @@ globalkeys = gears.table.join(
               {description = "go back", group = "tag"}),
     awful.key({ modkey, "Shift" }, "t",
         function()
-            titlebars_enabled = not titlebars_enabled
+            global_titlebar_enabled = not global_titlebar_enabled
             for _, c in ipairs(client.get()) do
-                if titlebars_enabled then
-                    awful.titlebar.show(c)
-                else
-                    awful.titlebar.hide(c)
-                end
+                update_client_titlebar(c)
             end
         end,
         {description = "toggle all titlebars", group = "awesome"}),
     awful.key({ modkey }, "b",
         function ()
-            -- Check state of the focused screen's wibar
-            local s = awful.screen.focused()
-            local action = not s.mywibox.visible
-            
-            -- Apply that state to ALL screens
+            global_wibar_enabled = not global_wibar_enabled
             for s in screen do
-                s.mywibox.visible = action
+                update_wibar_visibility(s)
             end
         end,
         {description = "toggle wibar", group = "awesome"}),
@@ -492,25 +520,6 @@ clientkeys = gears.table.join(
             -- Toggle the fullscreen state
             c.fullscreen = not c.fullscreen
             c:raise()
-
-            if c.fullscreen then
-                -- Hide the wibar (status bar)
-                if c.screen.mywibox then
-                    c.screen.mywibox.visible = false
-                end
-                -- Hide the titlebar
-                awful.titlebar.hide(c)
-            else
-                -- Show the wibar
-                if c.screen.mywibox then
-                    c.screen.mywibox.visible = true
-                end
-                
-                -- Restore the titlebar (only if they are globally enabled)
-                if titlebars_enabled then
-                    awful.titlebar.show(c)
-                end
-            end
         end,
         {description = "toggle fullscreen", group = "client"}),
     awful.key({ modkey, "Shift"   }, "c",      function (c) c:kill()                         end,
@@ -535,12 +544,6 @@ clientkeys = gears.table.join(
             c.minimized = true
         end ,
         {description = "minimize", group = "client"}),
-     awful.key({ modkey,           }, "m",
-        function (c)
-            c.maximized = not c.maximized
-            c:raise()
-        end ,
-        {description = "(un)maximize", group = "client"}),
     awful.key({ modkey,           }, "m",
         function (c)
             c.maximized = not c.maximized
@@ -745,19 +748,23 @@ client.connect_signal("request::titlebars", function(c)
         },
         layout = wibox.layout.align.horizontal
     }
+    -- If titlebars are globally disabled, hide the new one immediately
+    if not global_titlebar_enabled then
+        awful.titlebar.hide(c)
+    end
 end)
 
 -- Remove borders if there is only one client to save space
-screen.connect_signal("arrange", function (s)
-    local only_one = #s.tiled_clients == 1
-    for _, c in pairs(s.clients) do
-        if only_one and not c.floating then
-            c.border_width = 0
-        else
-            c.border_width = beautiful.border_width
-        end
-    end
-end)
+-- screen.connect_signal("arrange", function (s)
+--     local only_one = #s.tiled_clients == 1
+--     for _, c in pairs(s.clients) do
+--         if only_one and not c.floating then
+--             c.border_width = 0
+--         else
+--             c.border_width = beautiful.border_width
+--         end
+--     end
+-- end)
 
 -- Enable sloppy focus, so that focus follows mouse.
 client.connect_signal("mouse::enter", function(c)
