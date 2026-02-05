@@ -279,14 +279,14 @@ local function build_pill(widget, bg_color)
                 layout = wibox.layout.fixed.horizontal,
                 spacing = 10
             },
-            left = 10,
-            right = 10,
+            left = 6,
+            right = 6,
             top = 4,
             bottom = 4,
             widget = wibox.container.margin
         },
         bg = bg_color or "#1f1f1f", -- Dark grey pill background
-        shape = rounded_shape(20),  -- Fully rounded ends
+        shape = rounded_shape(10),  -- Fully rounded ends
         widget = wibox.container.background
     }
 end
@@ -324,34 +324,102 @@ awful.screen.connect_for_each_screen(function(s)
                            awful.button({ }, 4, function () awful.layout.inc( 1) end),
                            awful.button({ }, 5, function () awful.layout.inc(-1) end)))
 
-    -- {{{ Taglist (Dots style)
+    -- -- {{{ Taglist (Dots style)
+    -- s.mytaglist = awful.widget.taglist {
+    --     screen  = s,
+    --     filter  = awful.widget.taglist.filter.all,
+    --     style   = {
+    --         shape = gears.shape.circle,
+    --     },
+    --     layout   = {
+    --         spacing = 5,
+    --         layout  = wibox.layout.fixed.horizontal
+    --     },
+    --     widget_template = {
+    --         {
+    --             {
+    --                 id     = "text_role",
+    --                 widget = wibox.widget.textbox,
+    --             },
+    --             margins = 0,
+    --             widget  = wibox.container.margin,
+    --         },
+    --         id     = "background_role",
+    --         width  = 15, -- Size of the dots
+    --         height = 15,
+    --         widget = wibox.container.background,
+            
+    --         -- Add support for hover/click
+    --         create_callback = function(self, c3, index, objects) 
+    --             -- You can add tooltips here if needed
+    --         end,
+    --     },
+    --     buttons = taglist_buttons
+    -- }
+    -- -- }}}
+
+    -- {{{ Taglist (Dynamic Circles)
+
+    -- Define the styling logic separately so we can run it immediately AND on updates
+    local function update_tag_circle(self, c3, index, objects)
+        local box = self:get_children_by_id('custom_circle')[1]
+        
+        if c3.selected then
+            -- Active: Solid Cyan
+            box.bg = "#00ffff" 
+            box.border_width = 0
+        elseif #c3:clients() > 0 then
+            -- Occupied: Solid Grey
+            box.bg = "#555555" 
+            box.border_width = 0
+        else
+            -- Empty: Hollow Ring
+            box.bg = "#ffffff" -- Transparent
+            box.border_color = "#555555"
+            box.border_width = 2
+        end
+    end
+
     s.mytaglist = awful.widget.taglist {
         screen  = s,
         filter  = awful.widget.taglist.filter.all,
-        style   = {
-            shape = gears.shape.circle,
-        },
         layout   = {
-            spacing = 5,
+            spacing = 10,
             layout  = wibox.layout.fixed.horizontal
         },
         widget_template = {
             {
                 {
-                    id     = "text_role",
+                    -- Dummy widget to give the container substance
                     widget = wibox.widget.textbox,
+                    text   = "", 
                 },
-                margins = 0,
-                widget  = wibox.container.margin,
+                id     = "custom_circle", 
+                shape  = gears.shape.circle,
+                widget = wibox.container.background,
+                forced_height = 12,
+                forced_width  = 12,
             },
-            id     = "background_role",
-            width  = 15, -- Size of the dots
-            height = 15,
-            widget = wibox.container.background,
+            widget = wibox.container.margin,
+            top = 6, 
+            bottom = 6,
+            left = 2,
+            right = 2,
             
-            -- Add support for hover/click
-            create_callback = function(self, c3, index, objects) 
-                -- You can add tooltips here if needed
+            create_callback = function(self, c3, index, objects)
+                -- RUN IMMEDIATELY: Fixes the issue of dots not appearing on startup
+                update_tag_circle(self, c3, index, objects)
+
+                -- Add Tooltip
+                awful.tooltip({
+                    objects = { self },
+                    timer_function = function() return c3.name end,
+                })
+            end,
+
+            update_callback = function(self, c3, index, objects)
+                -- RUN ON CHANGE: Updates the look when you switch tags or open windows
+                update_tag_circle(self, c3, index, objects)
             end,
         },
         buttons = taglist_buttons
@@ -367,21 +435,22 @@ awful.screen.connect_for_each_screen(function(s)
             spacing = 5,
             layout  = wibox.layout.fixed.horizontal
         },
-        -- Notice that there is *no* text_role in the template, so only icons show
         widget_template = {
             {
                 {
                     {
-                        id     = "clienticon",
-                        widget = awful.widget.clienticon,
+                        -- CHANGED: Use 'icon_role' with imagebox
+                        -- This fixes the "nil value" error because Awesome handles it automatically
+                        id     = "icon_role",
+                        widget = wibox.widget.imagebox,
                     },
-                    margins = 2,
+                    margins = 2, -- Space between icon and pill edge
                     widget  = wibox.container.margin,
                 },
                 id     = "background_role",
                 widget = wibox.container.background,
             },
-            bg     = "#2c2c2c", -- Background for individual task items
+            bg     = "#2c2c2c", -- Background color of the individual task pill
             shape  = rounded_shape(10),
             widget = wibox.container.background,
         },
@@ -416,8 +485,24 @@ awful.screen.connect_for_each_screen(function(s)
     -- }}}
 
     -- Create the Wibar
-    -- height 35 to accommodate the pills
-    s.mywibox = awful.wibar({ position = "top", screen = s, height = 36, bg = "#00000000" }) -- Transparent background
+    s.mywibox = awful.wibar({ 
+        position = "top", 
+        screen = s, 
+        
+        -- 1. Height: Tall enough to fit the pills
+        height = 36, 
+        
+        -- 2. Background: Fully transparent
+        bg = "#00000000", 
+        
+        -- 3. On Top: Floats over windows
+        ontop = true,
+        type = "dock",
+
+        -- 4. Margins: This creates the gap from the screen edges
+        margins = { top = 4, left = 4, right = 4, bottom = 0 }
+    })
+
     update_wibar_visibility(s)
 
     -- Spacing widget
@@ -425,61 +510,52 @@ awful.screen.connect_for_each_screen(function(s)
 
     -- Add widgets to the wibox
     s.mywibox:setup {
-        layout = wibox.layout.align.horizontal,
-        expand = "none", -- Important for the middle widget to stay centered
-
-        -- {{{ Left Pills
+        -- WRAPPER: This container adds the margins to the screen edges
         {
-            layout = wibox.layout.fixed.horizontal,
-            spacing = 5,
-            
-            -- Pill 1: Launcher
-            build_pill(mylauncher),
-            
-            -- Pill 2: Taglist (Tags manager)
-            build_pill(s.mytaglist),
-            
-            -- Pill 3: Tasklist (Screens manager/Running apps)
-            build_pill(s.mytasklist),
-            
-            s.mypromptbox,
-        },
-        -- }}}
+            layout = wibox.layout.align.horizontal,
+            expand = "none",
 
-        -- {{{ Middle Pill: Time
-        {
-            layout = wibox.layout.fixed.horizontal,
-            build_pill(time_widget),
-        },
-        -- }}}
-
-        -- {{{ Right Pills
-        {
-            layout = wibox.layout.fixed.horizontal,
-            spacing = 5,
-
-            -- Pill 1: System Tray
-            -- Note: Systray sometimes draws its own background, but we try to contain it.
-            build_pill(wibox.widget.systray()),
-
-            -- Pill 2: Control Center (Battery/Wifi icons + Date)
-            -- I added some dummy text icons for bat/wifi. 
-            -- For real functionality, you need 'vicious' or 'upower' scripts.
-            build_pill(wibox.widget {
+            -- {{{ Left Pills
+            {
                 layout = wibox.layout.fixed.horizontal,
-                spacing = 8,
-                { text = "🔋", widget = wibox.widget.textbox }, -- Placeholder Battery
-                { text = "📶", widget = wibox.widget.textbox }, -- Placeholder Wifi
-                control_widget -- The Date
-            }),
+                spacing = 5,
+                build_pill(mylauncher),
+                build_pill(s.mytaglist),
+                build_pill(s.mytasklist),
+                s.mypromptbox,
+            },
+            -- }}}
 
-            -- Pill 3: Notification
-            build_pill(notif_icon),
+            -- {{{ Middle Pill: Time
+            {
+                layout = wibox.layout.fixed.horizontal,
+                build_pill(time_widget),
+            },
+            -- }}}
 
-            -- Pill 4: Layout
-            build_pill(s.mylayoutbox),
+            -- {{{ Right Pills
+            {
+                layout = wibox.layout.fixed.horizontal,
+                spacing = 5,
+                build_pill(wibox.widget.systray()),
+                build_pill(wibox.widget {
+                    layout = wibox.layout.fixed.horizontal,
+                    spacing = 8,
+                    { text = "🔋", widget = wibox.widget.textbox },
+                    { text = "📶", widget = wibox.widget.textbox },
+                    control_widget
+                }),
+                build_pill(notif_icon),
+                build_pill(s.mylayoutbox),
+            },
+            -- }}}
         },
-        -- }}}
+        -- MARGIN SETTINGS
+        top = 4,    -- Push down from top edge
+        left = 4,   -- Push in from left edge
+        right = 4,  -- Push in from right edge
+        bottom = 0, 
+        widget = wibox.container.margin
     }
 end)
 
