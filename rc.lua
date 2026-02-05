@@ -263,11 +263,39 @@ client.connect_signal("property::minimized", function(c) update_wibar_visibility
 
 -- }}}
 
+-- {{{ Helper Functions for the Pill Look
+local function rounded_shape(size)
+    return function(cr, width, height)
+        gears.shape.rounded_rect(cr, width, height, size)
+    end
+end
+
+-- Wrapper to create a "Pill" container
+local function build_pill(widget, bg_color)
+    return wibox.widget {
+        {
+            {
+                widget,
+                layout = wibox.layout.fixed.horizontal,
+                spacing = 10
+            },
+            left = 10,
+            right = 10,
+            top = 4,
+            bottom = 4,
+            widget = wibox.container.margin
+        },
+        bg = bg_color or "#1f1f1f", -- Dark grey pill background
+        shape = rounded_shape(20),  -- Fully rounded ends
+        widget = wibox.container.background
+    }
+end
+-- }}}
+
 local function set_wallpaper(s)
     -- Wallpaper
     if beautiful.wallpaper then
         local wallpaper = beautiful.wallpaper
-        -- If wallpaper is a function, call it with the screen
         if type(wallpaper) == "function" then
             wallpaper = wallpaper(s)
         end
@@ -275,66 +303,185 @@ local function set_wallpaper(s)
     end
 end
 
--- Re-set wallpaper when a screen's geometry changes (e.g. different resolution)
+-- Re-set wallpaper when a screen's geometry changes
 screen.connect_signal("property::geometry", set_wallpaper)
 
 awful.screen.connect_for_each_screen(function(s)
     -- Wallpaper
     set_wallpaper(s)
-    
-    -- s.padding = { left = padding, right = padding, top = padding, bottom = padding } 
 
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
 
     -- Create a promptbox for each screen
     s.mypromptbox = awful.widget.prompt()
-    -- Create an imagebox widget which will contain an icon indicating which layout we're using.
-    -- We need one layoutbox per screen.
+
+    -- Create an imagebox widget for the layout
     s.mylayoutbox = awful.widget.layoutbox(s)
     s.mylayoutbox:buttons(gears.table.join(
                            awful.button({ }, 1, function () awful.layout.inc( 1) end),
                            awful.button({ }, 3, function () awful.layout.inc(-1) end),
                            awful.button({ }, 4, function () awful.layout.inc( 1) end),
                            awful.button({ }, 5, function () awful.layout.inc(-1) end)))
-    -- Create a taglist widget
+
+    -- {{{ Taglist (Dots style)
     s.mytaglist = awful.widget.taglist {
         screen  = s,
         filter  = awful.widget.taglist.filter.all,
+        style   = {
+            shape = gears.shape.circle,
+        },
+        layout   = {
+            spacing = 5,
+            layout  = wibox.layout.fixed.horizontal
+        },
+        widget_template = {
+            {
+                {
+                    id     = "text_role",
+                    widget = wibox.widget.textbox,
+                },
+                margins = 0,
+                widget  = wibox.container.margin,
+            },
+            id     = "background_role",
+            width  = 15, -- Size of the dots
+            height = 15,
+            widget = wibox.container.background,
+            
+            -- Add support for hover/click
+            create_callback = function(self, c3, index, objects) 
+                -- You can add tooltips here if needed
+            end,
+        },
         buttons = taglist_buttons
     }
+    -- }}}
 
-    -- Create a tasklist widget
+    -- {{{ Tasklist (Icons only)
     s.mytasklist = awful.widget.tasklist {
         screen  = s,
         filter  = awful.widget.tasklist.filter.currenttags,
-        buttons = tasklist_buttons
+        buttons = tasklist_buttons,
+        layout   = {
+            spacing = 5,
+            layout  = wibox.layout.fixed.horizontal
+        },
+        -- Notice that there is *no* text_role in the template, so only icons show
+        widget_template = {
+            {
+                {
+                    {
+                        id     = "clienticon",
+                        widget = awful.widget.clienticon,
+                    },
+                    margins = 2,
+                    widget  = wibox.container.margin,
+                },
+                id     = "background_role",
+                widget = wibox.container.background,
+            },
+            bg     = "#2c2c2c", -- Background for individual task items
+            shape  = rounded_shape(10),
+            widget = wibox.container.background,
+        },
+    }
+    -- }}}
+
+    -- {{{ Custom Widgets based on your request
+
+    -- 1. Middle Widget: Time
+    local time_widget = wibox.widget.textclock("%H:%M")
+    time_widget.font = "Sans Bold 12"
+    time_widget.align = "center"
+    
+    -- 2. Right: Control Center (Battery, Wifi, Date)
+    -- Note: Real battery/wifi requires external libraries (like Vicious) or scripts.
+    -- Here is the layout matching the image with the Date.
+    local control_widget = wibox.widget {
+        format = "%a, %b %d", -- "Mon, Feb 02"
+        widget = wibox.widget.textclock
     }
 
-    -- Create the wibox
-    s.mywibox = awful.wibar({ position = "top", screen = s, ontop = true })
+    -- 3. Right: Notification Bell (Static icon for now)
+    local notif_icon = wibox.widget {
+        text = "🔔", 
+        font = "Sans 14",
+        widget = wibox.widget.textbox
+    }
+    notif_icon:buttons(gears.table.join(
+        awful.button({ }, 1, function() naughty.toggle() end) -- Toggle notifications if supported
+    ))
+
+    -- }}}
+
+    -- Create the Wibar
+    -- height 35 to accommodate the pills
+    s.mywibox = awful.wibar({ position = "top", screen = s, height = 36, bg = "#00000000" }) -- Transparent background
     update_wibar_visibility(s)
+
+    -- Spacing widget
+    local sep = wibox.widget.textbox(" ")
 
     -- Add widgets to the wibox
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,
-        { -- Left widgets
+        expand = "none", -- Important for the middle widget to stay centered
+
+        -- {{{ Left Pills
+        {
             layout = wibox.layout.fixed.horizontal,
-            mylauncher,
-            s.mytaglist,
+            spacing = 5,
+            
+            -- Pill 1: Launcher
+            build_pill(mylauncher),
+            
+            -- Pill 2: Taglist (Tags manager)
+            build_pill(s.mytaglist),
+            
+            -- Pill 3: Tasklist (Screens manager/Running apps)
+            build_pill(s.mytasklist),
+            
             s.mypromptbox,
         },
-        s.mytasklist, -- Middle widget
-        { -- Right widgets
+        -- }}}
+
+        -- {{{ Middle Pill: Time
+        {
             layout = wibox.layout.fixed.horizontal,
-            mykeyboardlayout,
-            wibox.widget.systray(),
-            mytextclock,
-            s.mylayoutbox,
+            build_pill(time_widget),
         },
+        -- }}}
+
+        -- {{{ Right Pills
+        {
+            layout = wibox.layout.fixed.horizontal,
+            spacing = 5,
+
+            -- Pill 1: System Tray
+            -- Note: Systray sometimes draws its own background, but we try to contain it.
+            build_pill(wibox.widget.systray()),
+
+            -- Pill 2: Control Center (Battery/Wifi icons + Date)
+            -- I added some dummy text icons for bat/wifi. 
+            -- For real functionality, you need 'vicious' or 'upower' scripts.
+            build_pill(wibox.widget {
+                layout = wibox.layout.fixed.horizontal,
+                spacing = 8,
+                { text = "🔋", widget = wibox.widget.textbox }, -- Placeholder Battery
+                { text = "📶", widget = wibox.widget.textbox }, -- Placeholder Wifi
+                control_widget -- The Date
+            }),
+
+            -- Pill 3: Notification
+            build_pill(notif_icon),
+
+            -- Pill 4: Layout
+            build_pill(s.mylayoutbox),
+        },
+        -- }}}
     }
 end)
--- }}}
 
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
