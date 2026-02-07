@@ -279,8 +279,8 @@ local function build_pill(widget, bg_color)
                 layout = wibox.layout.fixed.horizontal,
                 spacing = 10
             },
-            left = 6,
-            right = 6,
+            left = 8,
+            right = 8,
             top = 4,
             bottom = 4,
             widget = wibox.container.margin
@@ -323,42 +323,6 @@ awful.screen.connect_for_each_screen(function(s)
                            awful.button({ }, 3, function () awful.layout.inc(-1) end),
                            awful.button({ }, 4, function () awful.layout.inc( 1) end),
                            awful.button({ }, 5, function () awful.layout.inc(-1) end)))
-
-    -- -- {{{ Taglist (Dots style)
-    -- s.mytaglist = awful.widget.taglist {
-    --     screen  = s,
-    --     filter  = awful.widget.taglist.filter.all,
-    --     style   = {
-    --         shape = gears.shape.circle,
-    --     },
-    --     layout   = {
-    --         spacing = 5,
-    --         layout  = wibox.layout.fixed.horizontal
-    --     },
-    --     widget_template = {
-    --         {
-    --             {
-    --                 id     = "text_role",
-    --                 widget = wibox.widget.textbox,
-    --             },
-    --             margins = 0,
-    --             widget  = wibox.container.margin,
-    --         },
-    --         id     = "background_role",
-    --         width  = 15, -- Size of the dots
-    --         height = 15,
-    --         widget = wibox.container.background,
-            
-    --         -- Add support for hover/click
-    --         create_callback = function(self, c3, index, objects) 
-    --             -- You can add tooltips here if needed
-    --         end,
-    --     },
-    --     buttons = taglist_buttons
-    -- }
-    -- -- }}}
-
-    -- {{{ Taglist (Dynamic Circles)
 
     -- Define the styling logic separately so we can run it immediately AND on updates
     local function update_tag_circle(self, c3, index, objects)
@@ -440,7 +404,6 @@ awful.screen.connect_for_each_screen(function(s)
                 {
                     {
                         -- CHANGED: Use 'icon_role' with imagebox
-                        -- This fixes the "nil value" error because Awesome handles it automatically
                         id     = "icon_role",
                         widget = wibox.widget.imagebox,
                     },
@@ -455,6 +418,44 @@ awful.screen.connect_for_each_screen(function(s)
             widget = wibox.container.background,
         },
     }
+
+    -- 1. Wrap the tasklist in your pill container and save it to a variable
+    s.mytasklist_pill = build_pill(s.mytasklist)
+
+    -- 2. Define a function to toggle visibility based on clients
+    local function update_tasklist_visibility()
+        local t = s.selected_tag
+        if t then
+            -- Get number of clients on the selected tag
+            local client_count = #t:clients()
+            -- Show if there is at least 1 client, hide otherwise
+            s.mytasklist_pill.visible = (client_count > 0)
+        else
+            s.mytasklist_pill.visible = false
+        end
+    end
+
+    -- 3. Connect signals to trigger the update
+    -- When switching tags
+    tag.connect_signal("property::selected", function(t)
+        if t.screen == s then update_tasklist_visibility() end
+    end)
+    -- When a client is opened, closed, moved, or tagged
+    client.connect_signal("manage", function(c) 
+        if c.screen == s then update_tasklist_visibility() end 
+    end)
+    client.connect_signal("unmanage", function(c) 
+        if c.screen == s then update_tasklist_visibility() end 
+    end)
+    client.connect_signal("tagged", function(c) 
+        if c.screen == s then update_tasklist_visibility() end 
+    end)
+    client.connect_signal("untagged", function(c) 
+        if c.screen == s then update_tasklist_visibility() end 
+    end)
+
+    -- Run once on startup to set initial state
+    update_tasklist_visibility()
     -- }}}
 
     -- {{{ Custom Widgets based on your request
@@ -465,8 +466,6 @@ awful.screen.connect_for_each_screen(function(s)
     time_widget.align = "center"
     
     -- 2. Right: Control Center (Battery, Wifi, Date)
-    -- Note: Real battery/wifi requires external libraries (like Vicious) or scripts.
-    -- Here is the layout matching the image with the Date.
     local control_widget = wibox.widget {
         format = "%a, %b %d", -- "Mon, Feb 02"
         widget = wibox.widget.textclock
@@ -474,10 +473,11 @@ awful.screen.connect_for_each_screen(function(s)
 
     -- 3. Right: Notification Bell (Static icon for now)
     local notif_icon = wibox.widget {
-        text = "🔔", 
-        font = "Sans 14",
+        text   = "  ",
+        font   = "JetBrains Nerd Font 14",
         widget = wibox.widget.textbox
     }
+
     notif_icon:buttons(gears.table.join(
         awful.button({ }, 1, function() naughty.toggle() end) -- Toggle notifications if supported
     ))
@@ -488,18 +488,10 @@ awful.screen.connect_for_each_screen(function(s)
     s.mywibox = awful.wibar({ 
         position = "top", 
         screen = s, 
-        
-        -- 1. Height: Tall enough to fit the pills
         height = 36, 
-        
-        -- 2. Background: Fully transparent
         bg = "#00000000", 
-        
-        -- 3. On Top: Floats over windows
         ontop = true,
         type = "dock",
-
-        -- 4. Margins: This creates the gap from the screen edges
         margins = { top = 4, left = 4, right = 4, bottom = 0 }
     })
 
@@ -521,7 +513,8 @@ awful.screen.connect_for_each_screen(function(s)
                 spacing = 5,
                 build_pill(mylauncher),
                 build_pill(s.mytaglist),
-                build_pill(s.mytasklist),
+                -- CHANGED: Use the variable we created instead of building a new one
+                s.mytasklist_pill, 
                 s.mypromptbox,
             },
             -- }}}
@@ -540,9 +533,17 @@ awful.screen.connect_for_each_screen(function(s)
                 build_pill(wibox.widget.systray()),
                 build_pill(wibox.widget {
                     layout = wibox.layout.fixed.horizontal,
-                    spacing = 8,
-                    { text = "🔋", widget = wibox.widget.textbox },
-                    { text = "📶", widget = wibox.widget.textbox },
+                    spacing = 12, -- Increase spacing slightly for text icons
+                    { 
+                        text = " ", 
+                        font = "JetBrainsMono Nerd Font 16", 
+                        widget = wibox.widget.textbox 
+                    },
+                    { 
+                        text = " ", 
+                        font = "JetBrainsMono Nerd Font 12", 
+                        widget = wibox.widget.textbox 
+                    },
                     control_widget
                 }),
                 build_pill(notif_icon),
