@@ -568,6 +568,52 @@ root.buttons(gears.table.join(
 ))
 -- }}}
 
+-- {{{ Custom "Padded Maximize" Function
+local function toggle_padded_maximize(c)
+    local padding = 10 -- The 10px gap you want
+    
+    -- If the window is "officially" maximized, turn that off first
+    if c.maximized then
+        c.maximized = false
+    end
+
+    if c.is_padded_maximized then
+        -- RESTORE: Put it back to how it was
+        c.floating = c.orig_floating or false
+        
+        -- Only restore geometry if it was originally floating
+        if c.orig_floating and c.orig_geometry then
+            c:geometry(c.orig_geometry)
+        end
+        
+        -- Restore borders
+        -- c.border_width = beautiful.border_width
+        c.is_padded_maximized = false
+    else
+        -- MAXIMIZE: Save state and apply custom size
+        c.orig_floating = c.floating
+        c.orig_geometry = c:geometry()
+        
+        c.floating = true
+        
+        -- Optional: Remove border when maximized for a cleaner look
+        -- c.border_width = 0 
+        
+        -- Calculate available space (workarea) minus the padding
+        local wa = c.screen.workarea
+        c:geometry({
+            x = wa.x + padding,
+            y = wa.y + padding,
+            width = wa.width - (2 * padding),
+            height = wa.height - (2 * padding)
+        })
+        
+        c.is_padded_maximized = true
+        c:raise()
+    end
+end
+-- }}}
+
 -- {{{ Key bindings
 local titlebars_enabled = true
 
@@ -746,6 +792,7 @@ clientkeys = gears.table.join(
             c:raise()
         end,
         {description = "toggle fullscreen", group = "client"}),
+
     awful.key({ modkey, "Shift"   }, "c",      function (c) c:kill()                         end,
               {description = "close", group = "client"}),
     awful.key({ modkey, "Control" }, "c", function (c)
@@ -753,14 +800,19 @@ clientkeys = gears.table.join(
             awful.spawn("kill -9 " .. c.pid)
         end
         end, {description = "force kill", group = "client"}),
+
     awful.key({ modkey, "Control" }, "space",  awful.client.floating.toggle                     ,
               {description = "toggle floating", group = "client"}),
+
     awful.key({ modkey, "Control" }, "Return", function (c) c:swap(awful.client.getmaster()) end,
               {description = "move to master", group = "client"}),
+
     awful.key({ modkey,           }, "o",      function (c) c:move_to_screen()               end,
               {description = "move to screen", group = "client"}),
+
     awful.key({ modkey,           }, "t",      function (c) c.ontop = not c.ontop            end,
               {description = "toggle keep on top", group = "client"}),
+
     awful.key({ modkey,           }, "n",
         function (c)
             -- The client currently has the input focus, so it cannot be
@@ -768,12 +820,19 @@ clientkeys = gears.table.join(
             c.minimized = true
         end ,
         {description = "minimize", group = "client"}),
+
     awful.key({ modkey,           }, "m",
         function (c)
             c.maximized = not c.maximized
             c:raise()
         end ,
         {description = "(un)maximize", group = "client"}),
+
+    awful.key({ modkey, "Shift"   }, "m",
+        function (c)
+            toggle_padded_maximize(c)
+        end,
+        {description = "maximize with 10px gap", group = "client"}),
 
     awful.key({ modkey, "Control" }, "m",
         function (c)
@@ -997,4 +1056,7 @@ end)
 
 client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
 client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
+client.connect_signal("property::maximized", function(c)
+    c.border_width = beautiful.border_width
+end)
 -- }}}
