@@ -59,8 +59,7 @@ user_wibar_enabled = true
 user_titlebars_enabled = true
 
 -- Theme and Background
-
-beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
+beautiful.init("~/.config/awesome/themes/default.lua")
 beautiful.useless_gap = padding
 beautiful.gap_single_client = true
 
@@ -70,7 +69,7 @@ awful.layout.suit.tile.top.gap_screen_edge = false
 -- {{{ Border Settings
 -- Width of the border (in pixels). 
 -- 3 is usually thick enough to be clearly visible.
-beautiful.border_width = 2
+beautiful.border_width = 1
 
 -- The color of the window currently in focus (Orange to match your tags)
 beautiful.border_focus  = "#00ffff" 
@@ -281,12 +280,12 @@ local function build_pill(widget, bg_color)
             },
             left = 8,
             right = 8,
-            top = 4,
-            bottom = 4,
+            top = 2,
+            bottom = 2,
             widget = wibox.container.margin
         },
         bg = bg_color or "#1f1f1f", -- Dark grey pill background
-        shape = rounded_shape(10),  -- Fully rounded ends
+        shape = rounded_shape(5),  -- Fully rounded ends
         widget = wibox.container.background
     }
 end
@@ -488,7 +487,7 @@ awful.screen.connect_for_each_screen(function(s)
     s.mywibox = awful.wibar({ 
         position = "top", 
         screen = s, 
-        height = 36, 
+        height = 40, 
         bg = "#00000000", 
         ontop = true,
         type = "dock",
@@ -553,9 +552,9 @@ awful.screen.connect_for_each_screen(function(s)
         },
         -- MARGIN SETTINGS
         top = 4,    -- Push down from top edge
-        left = 4,   -- Push in from left edge
-        right = 4,  -- Push in from right edge
-        bottom = 0, 
+        left = padding * 2,   -- Push in from left edge
+        right = padding * 2,  -- Push in from right edge
+        bottom = 4, 
         widget = wibox.container.margin
     }
 end)
