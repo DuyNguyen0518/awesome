@@ -461,7 +461,7 @@ awful.screen.connect_for_each_screen(function(s)
 
     -- 1. Middle Widget: Time
     local time_widget = wibox.widget.textclock("%H:%M")
-    time_widget.font = "Sans Bold 12"
+    time_widget.font = "JetBrainsMono Nerd Font 13"
     time_widget.align = "center"
     
     -- 2. Right: Control Center (Battery, Wifi, Date)
@@ -491,7 +491,6 @@ awful.screen.connect_for_each_screen(function(s)
         bg = "#00000000", 
         ontop = true,
         type = "dock",
-        margins = { top = 4, left = 4, right = 4, bottom = 0 }
     })
 
     update_wibar_visibility(s)
